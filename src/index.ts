@@ -2,6 +2,7 @@ import AWS from 'aws-sdk';
 import dotenv from 'dotenv';
 import express from 'express';
 import slugify from 'slugify';
+import fetch from 'node-fetch';
 import bodyParser from 'body-parser';
 
 import { PDFParser } from './PDFParser';
@@ -56,9 +57,14 @@ async function parsePDF(url: string) {
 type UploadPDFOptions = {
   key: string;
   pdf: Buffer;
+  eventId: string;
+  token: string;
 };
 
-function uploadPDF({ key, pdf }: UploadPDFOptions, res: express.Response) {
+function uploadPDF(
+  { key, pdf, eventId, token }: UploadPDFOptions,
+  res: express.Response
+) {
   const uploadParams: AWS.S3.PutObjectRequest = {
     Bucket: process.env.AWS_BUCKET_NAME as string,
     Key: `${slugify(key)}.pdf`,
@@ -66,16 +72,36 @@ function uploadPDF({ key, pdf }: UploadPDFOptions, res: express.Response) {
     ACL: 'public-read',
   };
 
-  s3.upload(uploadParams, (err, data) => {
+  s3.upload(uploadParams, async (err, data) => {
     if (err) {
       // TODO rollbar log
       console.log('Error', err);
-      res.status(400).send();
+      res.status(400).send({ error: 'S3 Upload Failed' });
     }
     if (data) {
       // TODO POST to daspdp.org api
       console.log('Upload Success', data.Location);
-      res.status(204).send();
+      const response = await fetch(
+        `https://daspdp.org/api/events/${eventId}/link-pdf`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            pdfUrl: data.Location,
+          }),
+        }
+      );
+      if (response.ok) {
+        res.status(204).send();
+      } else {
+        res
+          .status(400)
+          .send({
+            error: `PDF link ${data.Location} to Event ${eventId} failed`,
+          });
+      }
     }
   });
 }
@@ -86,15 +112,24 @@ const app = express();
 app.use(bodyParser.json());
 
 app.post('/', async (req, res) => {
-  const { key, url } = req.body;
-  if (!key || !url || typeof key !== 'string' || typeof url !== 'string') {
-    return res.status(400).send();
+  const { key, url, eventId, token } = req.body;
+  if (
+    !key ||
+    !url ||
+    !eventId ||
+    !token ||
+    typeof key !== 'string' ||
+    typeof url !== 'string' ||
+    typeof token !== 'string' ||
+    !['string', 'number'].includes(typeof eventId)
+  ) {
+    return res.status(400).send({ error: 'Invalid POST body' });
   }
   const pdf = await parsePDF(url);
   if (!pdf) {
-    return res.status(400).send();
+    return res.status(400).send({ error: 'Failed to generate PDF' });
   }
-  uploadPDF({ key, pdf }, res);
+  uploadPDF({ key, pdf, eventId, token }, res);
 });
 
 app.listen(port, () => {
