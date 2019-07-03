@@ -10,7 +10,7 @@ Install deps:
 $ yarn
 ```
 
-Run tsc server:
+Run express server:
 
 ```shell
 $ yarn start

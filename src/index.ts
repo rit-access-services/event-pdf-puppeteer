@@ -1,12 +1,12 @@
-import { resolve } from 'path';
-
 import AWS from 'aws-sdk';
-import { config } from 'dotenv';
+import dotenv from 'dotenv';
+import express from 'express';
 import slugify from 'slugify';
+import bodyParser from 'body-parser';
 
 import { PDFParser } from './PDFParser';
 
-config({ path: resolve(__dirname, '../.env') });
+dotenv.config();
 
 const requiredEnvironmentVariables = [
   'AWS_ACCESS_KEY_ID',
@@ -34,12 +34,7 @@ const s3 = new AWS.S3({
   apiVersion: '2006-03-01',
 });
 
-type PDFParseEvent = {
-  url: string;
-  key: string;
-};
-
-export async function handler({ url, key }: PDFParseEvent) {
+async function parsePDF(url: string) {
   let pdf: Buffer | undefined = undefined;
 
   const pdfParser = await PDFParser.build();
@@ -53,6 +48,17 @@ export async function handler({ url, key }: PDFParseEvent) {
     await pdfParser.closeBrowser();
   }
 
+  if (!pdf) {
+  }
+  return pdf;
+}
+
+type UploadPDFOptions = {
+  key: string;
+  pdf: Buffer;
+};
+
+function uploadPDF({ key, pdf }: UploadPDFOptions, res: express.Response) {
   const uploadParams: AWS.S3.PutObjectRequest = {
     Bucket: process.env.AWS_BUCKET_NAME as string,
     Key: `${slugify(key)}.pdf`,
@@ -64,10 +70,33 @@ export async function handler({ url, key }: PDFParseEvent) {
     if (err) {
       // TODO rollbar log
       console.log('Error', err);
+      res.status(400).send();
     }
     if (data) {
       // TODO POST to daspdp.org api
       console.log('Upload Success', data.Location);
+      res.status(204).send();
     }
   });
 }
+
+const port = process.env.SERVER_PORT || 3531;
+
+const app = express();
+app.use(bodyParser.json());
+
+app.post('/', async (req, res) => {
+  const { key, url } = req.body;
+  if (!key || !url || typeof key !== 'string' || typeof url !== 'string') {
+    return res.status(400).send();
+  }
+  const pdf = await parsePDF(url);
+  if (!pdf) {
+    return res.status(400).send();
+  }
+  uploadPDF({ key, pdf }, res);
+});
+
+app.listen(port, () => {
+  console.log(`server started at http://localhost:${port}`);
+});
