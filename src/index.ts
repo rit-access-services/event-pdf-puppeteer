@@ -85,22 +85,18 @@ function uploadPDF(
         `https://daspdp.org/api/events/${eventId}/link-pdf`,
         {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
           body: JSON.stringify({
             pdfUrl: data.Location,
+            token,
           }),
         }
       );
       if (response.ok) {
         res.status(204).send();
       } else {
-        res
-          .status(400)
-          .send({
-            error: `PDF link ${data.Location} to Event ${eventId} failed`,
-          });
+        res.status(400).send({
+          error: `PDF link ${data.Location} to Event ${eventId} failed`,
+        });
       }
     }
   });
@@ -125,7 +121,7 @@ app.post('/', async (req, res) => {
   ) {
     return res.status(400).send({ error: 'Invalid POST body' });
   }
-  const pdf = await parsePDF(url);
+  const pdf = await parsePDF(`${url}?token=${token}`);
   if (!pdf) {
     return res.status(400).send({ error: 'Failed to generate PDF' });
   }
