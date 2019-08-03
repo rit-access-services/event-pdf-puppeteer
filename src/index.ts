@@ -83,21 +83,25 @@ function uploadPDF(
     }
     if (data) {
       console.log('Upload Success', data.Location);
-      const response = await fetch(callbackUrl, {
-        method: 'POST',
-        body: JSON.stringify({
-          pdfUrl: data.Location,
-          token,
-        }),
-      });
-      if (response.ok) {
-        res.status(204).send();
-      } else {
-        const error = `PDF link ${data.Location} to Event ${eventId} failed`;
-        rollbar.error(error);
-        res.status(400).send({
-          error,
+      try {
+        const response = await fetch(callbackUrl, {
+          method: 'POST',
+          body: JSON.stringify({
+            pdfUrl: data.Location,
+            token,
+          }),
         });
+        if (response.ok) {
+          res.status(204).send();
+        } else {
+          const error = `PDF link ${data.Location} to Event ${eventId} failed`;
+          rollbar.error(error, response.statusText, response.body);
+          res.status(400).send({
+            error,
+          });
+        }
+      } catch (e) {
+        rollbar.error(e);
       }
     }
   });
