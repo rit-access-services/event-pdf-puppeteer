@@ -59,10 +59,11 @@ type UploadPDFOptions = {
   pdf: Buffer;
   eventId: string;
   token: string;
+  callbackUrl: string;
 };
 
 function uploadPDF(
-  { key, pdf, eventId, token }: UploadPDFOptions,
+  { key, pdf, eventId, token, callbackUrl }: UploadPDFOptions,
   res: express.Response
 ) {
   const uploadParams: AWS.S3.PutObjectRequest = {
@@ -81,16 +82,13 @@ function uploadPDF(
     if (data) {
       // TODO POST to daspdp.org api
       console.log('Upload Success', data.Location);
-      const response = await fetch(
-        `https://daspdp.org/api/events/${eventId}/link-pdf`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            pdfUrl: data.Location,
-            token,
-          }),
-        }
-      );
+      const response = await fetch(callbackUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+          pdfUrl: data.Location,
+          token,
+        }),
+      });
       if (response.ok) {
         res.status(204).send();
       } else {
@@ -108,24 +106,26 @@ const app = express();
 app.use(bodyParser.json());
 
 app.post('/', async (req, res) => {
-  const { key, url, eventId, token } = req.body;
+  const { key, puppeteerUrl, callbackUrl, eventId, token } = req.body;
   if (
     !key ||
-    !url ||
+    !puppeteerUrl ||
+    !callbackUrl ||
     !eventId ||
     !token ||
     typeof key !== 'string' ||
-    typeof url !== 'string' ||
+    typeof puppeteerUrl !== 'string' ||
+    typeof callbackUrl !== 'string' ||
     typeof token !== 'string' ||
     !['string', 'number'].includes(typeof eventId)
   ) {
     return res.status(400).send({ error: 'Invalid POST body' });
   }
-  const pdf = await parsePDF(`${url}?token=${token}`);
+  const pdf = await parsePDF(`${puppeteerUrl}?token=${token}`);
   if (!pdf) {
     return res.status(400).send({ error: 'Failed to generate PDF' });
   }
-  uploadPDF({ key, pdf, eventId, token }, res);
+  uploadPDF({ key, pdf, eventId, token, callbackUrl }, res);
 });
 
 app.listen(port, () => {
