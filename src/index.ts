@@ -4,10 +4,16 @@ import express from 'express';
 import slugify from 'slugify';
 import fetch from 'node-fetch';
 import bodyParser from 'body-parser';
-
+import Rollbar from 'rollbar';
 import { PDFParser } from './PDFParser';
 
 dotenv.config();
+
+const rollbar = new Rollbar({
+  accessToken: process.env.ROLLBAR_ACCESS_TOKEN,
+  captureUncaught: true,
+  captureUnhandledRejections: true,
+});
 
 const requiredEnvironmentVariables = [
   'AWS_ACCESS_KEY_ID',
@@ -43,14 +49,11 @@ async function parsePDF(url: string) {
   try {
     pdf = await pdfParser.generatePDF(url);
   } catch (err) {
-    // TODO rollbar log
-    console.log('Puppeteer Error', err);
+    rollbar.error('Puppeteer Error', err);
   } finally {
     await pdfParser.closeBrowser();
   }
 
-  if (!pdf) {
-  }
   return pdf;
 }
 
@@ -75,12 +78,10 @@ function uploadPDF(
 
   s3.upload(uploadParams, async (err, data) => {
     if (err) {
-      // TODO rollbar log
-      console.log('Error', err);
+      rollbar.error(err);
       res.status(400).send({ error: 'S3 Upload Failed' });
     }
     if (data) {
-      // TODO POST to daspdp.org api
       console.log('Upload Success', data.Location);
       const response = await fetch(callbackUrl, {
         method: 'POST',
@@ -92,8 +93,10 @@ function uploadPDF(
       if (response.ok) {
         res.status(204).send();
       } else {
+        const error = `PDF link ${data.Location} to Event ${eventId} failed`;
+        rollbar.error(error);
         res.status(400).send({
-          error: `PDF link ${data.Location} to Event ${eventId} failed`,
+          error,
         });
       }
     }
