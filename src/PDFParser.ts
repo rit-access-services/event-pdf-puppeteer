@@ -22,7 +22,10 @@ export class PDFParser {
 
   public static async build(pdfConfig?: puppeteer.PDFOptions) {
     // Puppeteer can only generate pdfs in headless mode.
-    const browser = await puppeteer.launch({ headless: true });
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
 
     return new PDFParser({ browser, pdfConfig });
   }
