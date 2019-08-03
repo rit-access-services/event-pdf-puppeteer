@@ -86,6 +86,9 @@ function uploadPDF(
       try {
         const response = await fetch(callbackUrl, {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
             pdfUrl: data.Location,
             token,
