@@ -8,7 +8,7 @@ services:
       - AWS_ACCESS_KEY_ID=REPLACE_ME_you_likely_dont_need_this_in_dev_REPLACE_ME
       - AWS_SECRET_ACCESS_KEY=REPLACE_ME_you_likely_dont_need_this_in_dev_REPLACE_ME
       - AWS_BUCKET_NAME=REPLACE_ME_you_likely_dont_need_this_in_dev_REPLACE_ME
-      - SERVER_PORT=3531
+      - PORT=3531
     ports:
       - 3531:3531
     volumes:

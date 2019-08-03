@@ -102,7 +102,7 @@ function uploadPDF(
   });
 }
 
-const port = process.env.SERVER_PORT || 3531;
+const port = process.env.PORT || 3531;
 
 const app = express();
 app.use(bodyParser.json());
